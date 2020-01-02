@@ -1,0 +1,45 @@
+# WordCount with different parallelism yeilds below results.
+parallelism=1 21s parallelism=2 14s parallelism=4 26s
+
+# CellCluster For Berlin CSV File
+parallelism=1 runtime=17s , parallelism=2 runtime=13s , parallelism=4 runtime=24s
+
+# With more iterations and larger value of k we have larger runtime of execution for program
+# If both are high then runtime of program was exceeding to a higher value.
+# Parallelism 2
+Tests:
+--iterations  10 --k 300 => 11s
+--iterations 100 --k 500 => 37s
+--iterations 100 --k 100 => 22s
+
+# With different initial placements the performance was same.
+# With Germany File on flink cluster, it took 3 hours to complete execution without 'k' and for 10 iterations.
+# Parallelism 2 produced best results as with higher parallelisim communication cost inreases.
+
+WordCount
+
+1. Which steps in your program require communication and synchronization between your workers?
+The initails map process takes place in each node. Communication happens between the Group combine and the group reduce steps.
+Once the map processes are done, reduce process which is the Data Sink requires synchronization between the workers. 
+
+2. What resources are your programs bound by? Memory? CPU? Network? Disk?
+For the work count program, the bottleneck will be around the network to read the input from S3 and also for the synchronization between the workers 
+in the reduce step. As there is not much processing in the word count program, its not CPU bound.
+
+3. Could you improve the partitioning of your data to yield better run-time?
+For the wordcount program we found that, when we increased the parallelism, the performance was reduced(took more time when we increased the parallelism).
+It is because, the processing requirement is too low in the program and with the increase in parallelism result in the increased overhead of network for the
+communication and synchronization of the workers.
+
+KMeans
+
+1. Which steps in your program require communication and synchronization between your workers?
+Comminication happens at all steps as the workers need to communicate in the mp as well as the reduce process. In the GroupReduce function to find the 
+first centroid and during writing to the file, workers need synchronization.
+
+2. What resources are your programs bound by? Memory? CPU? Network? Disk? 
+The KMeans programs is mainly CPU bound as there is lot of processing in the program. It utilizes network as well for the communication between the workers.
+
+3. Could you improve the partitioning of your data to yield better run-time?
+Increasing parallelism to 2 has increased the performance in the case of the KMeans program. But further increasing the paralleism a lot can cause the
+program to consume the network a lot for the communication and synchronization which will reduce the performance.

@@ -1,0 +1,41 @@
+# COMMANDS FOR SETUP OF FLINK CLUSTER USING AWS CLI(ALREADY INSTALLED IN ASSIGNMENT-1).
+# Created a cluster on AWS EMR in eu-central-1 region with default configurations and default roles.
+# Logs will be saved to S3 storage.
+
+# Command to create default aws emr roles.
+aws emr create-default-roles
+
+# Command to create cluster of flink with following configurations.
+aws emr create-cluster --release-label emr-5.20.0 --name "Flink Cluster" --applications Name=Flink 
+--configurations file://./configuration.json --region eu-central-1 --log-uri s3://FlinkLogs --instance-type m4.large 
+--instance-count 2 --service-role EMR_DefaultRole --ec2-attributes KeyName=FlinkClusterKey, InstanceProfile=EMR_EC2_DefaultRole
+#Above command give the cluster Id and noted for further use.
+
+# Command to create an s3 bucket for Storage of logs, input and output files.
+#Name should be globally unique.
+aws s3 mb cloud-4-flink
+
+# Copy input files to s3 storage and jars as well.
+aws s3 cp tolstoy-war-and-peace.txt s3://cloud-4-flink
+aws s3 cp opencellid_data s3://cloud-4-flink --recursive
+aws s3 cp *.jar s3://cloud-4-flink  --recursive
+
+#Below each commands will add a new step to the cluster to run the jar with given files.
+#Specifies necessary parameters such as cluster Id, region of cluster, running jar file using command-runner, input and output files.
+#For Word Count
+aws emr add-steps --cluster-id j-V8WCHJIBA8FJ9 --steps Type=CUSTOM_JAR,Name=WordCount,Jar=command-runner.jar,
+Args="flink","run","-m","yarn-cluster","-yn","2","/home/hadoop/word-count-1.0-SNAPSHOT.jar",
+"--input","s3://cloud-4-flink/tolstoy-war-and-peace.txt","--output","s3://cloud-4-flink/word-count.csv" --region eu-central-1
+
+#For Berlin Map
+aws emr add-steps --cluster-id j-V8WCHJIBA8FJ9 --steps Type=CUSTOM_JAR,Name=BerlinMap,Jar=command-runner.jar,
+Args="flink","run","-m","yarn-cluster","-yn","2","/home/hadoop/kmeans-1.0-SNAPSHOT.jar",
+"--input","s3://cloud-4-flink/berlin.csv","--output","s3://cloud-4-flink/berlin-cluster.csv" 
+,"--iterations","10","--k","200" --region eu-central-1
+
+#Initially, For Germany Input File, Without passing k it took 3 hours to complete the execution.
+#We changed this parameter and iterations to find different runtime.
+aws emr add-steps --cluster-id j-V8WCHJIBA8FJ9 --steps Type=CUSTOM_JAR,Name=GermanyMap,Jar=command-runner.jar,
+Args="flink","run","-m","yarn-cluster","-yn","2","/home/hadoop/kmeans-1.0-SNAPSHOT.jar",
+"--input","s3://cloud-4-flink/germany.csv ","--output","s3://cloud-4-flink/germany-cluster.csv",
+"--iterations","10","--k","100" --region eu-central-1
